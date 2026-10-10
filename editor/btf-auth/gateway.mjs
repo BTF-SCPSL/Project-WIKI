@@ -141,6 +141,7 @@ async function handle(req, res) {
   }
   if (path.pathname === '/auth/logout') {
     if (req.method !== 'POST') return send(res, 405, 'Method not allowed');
+    if (req.headers.origin !== origin) return send(res, 403, 'Invalid origin');
     const raw = parseCookies(req.headers.cookie ?? '').get(cookieName);
     if (raw) sessions.delete(hashToken(raw));
     return redirect(res, '/', { 'set-cookie': cookie('', 0) });
