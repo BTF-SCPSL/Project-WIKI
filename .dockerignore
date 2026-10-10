@@ -1,0 +1,14 @@
+*
+!btf-wiki/
+!btf-wiki/**
+!editor/
+!editor/**
+!deployment/
+!deployment/**
+**/node_modules
+**/.next
+**/.source
+**/dist
+**/.git
+**/.env
+**/.env.*
