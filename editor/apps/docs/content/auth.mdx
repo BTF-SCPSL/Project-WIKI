@@ -1,0 +1,78 @@
+---
+title: Auth
+icon: KeyRound
+description: Decide who may read and write which documents
+---
+
+By default, anyone who can reach the sync server can edit, like Vite's own
+dev server. Pass an `authenticate` hook to the server to put the websocket,
+uploads and assets behind your own policy.
+
+## Add an `authenticate` hook
+
+`authenticate` receives the request and returns a [scope](#scopes), or
+`null` to reject. It runs on every connection and reconnect, so refreshed
+credentials apply.
+
+<Tabs items={["Cookie session", "Bearer token"]}>
+<Tab>
+
+Cookies come with every request, so only the server changes:
+
+<include meta='title="server.ts"'>../examples/auth-cookie.ts</include>
+
+</Tab>
+<Tab>
+
+Give the [sync client](/sync#sync-client) an `auth` function. It is called
+on every connection:
+
+<include meta='title="client.ts"'>../examples/auth-token-client.ts</include>
+
+<include meta='title="editor.tsx"'>../examples/auth-token-editor.tsx</include>
+
+The server receives its return value as `payload`:
+
+<include meta='title="server.ts"'>../examples/auth-token-server.ts</include>
+
+</Tab>
+</Tabs>
+
+## Scopes
+
+<auto-type-table path="../../../packages/core/src/sync/node/scope.ts" name="SyncScope" />
+
+`read` and `write` can be functions of a document's path, relative to the
+server root:
+
+- Paths are normalized first, so `team-a/../secret.mdx` does not match a
+  `team-a/` rule.
+- The functions must be synchronous. Fetch what they need inside
+  `authenticate`, as the token example does.
+
+<Accordions>
+<Accordion title="What each permission covers">
+
+| Needs `read`               | Needs `write`                           |
+| -------------------------- | --------------------------------------- |
+| opening a document         | saving it, or editing it under collab   |
+| seeing it in the file tree | creating, deleting and reordering pages |
+| loading an asset           | uploading to `assets/`                  |
+
+A scope `user` also overrides the name a collab client shows at its caret.
+
+</Accordion>
+</Accordions>
+
+## Media uploads
+
+Upload requests do not share the websocket, so send the same payload in the
+`AUTH_HEADER` header. Cookie setups can skip this.
+
+<include meta='title="media.ts"'>../examples/auth-upload.ts</include>
+
+## In the editor
+
+The server enforces the scope; the editor never restricts itself. When a user
+cannot write, see [Read-only](/read-only) to show the editor as read-only.
+Rejected credentials show the `denied` [status](/sync#saving).

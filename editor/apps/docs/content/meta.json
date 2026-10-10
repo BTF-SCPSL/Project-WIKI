@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "index",
+    "studio",
+    "---Sync---",
+    "sync",
+    "file-tree",
+    "collab",
+    "auth",
+    "protocol",
+    "---Customize---",
+    "components",
+    "syntax",
+    "providers",
+    "read-only",
+    "---Reference---",
+    "editor",
+    "limits"
+  ]
+}

@@ -1,0 +1,113 @@
+import { Node, mergeAttributes } from "@tiptap/core";
+import { MdxJsxFlowElement, MdxJsxTag, MdxJsxTagBlock } from "./jsx-tags";
+
+/**
+ * JSON-safe mirror of mdast-util-mdx-jsx attribute nodes (estree data stripped),
+ * stored on PM node attrs so the doc stays serializable.
+ */
+export interface MdxJsxAttribute {
+  type: "mdxJsxAttribute";
+  name: string;
+  value:
+    | string
+    | null
+    | {
+        type: "mdxJsxAttributeValueExpression";
+        value: string;
+        /** the expression's value when it is a static literal (JSON-safe),
+         * extracted at parse time so the UI can edit it structurally */
+        literal?: unknown;
+      };
+}
+
+export interface MdxJsxExpressionAttribute {
+  type: "mdxJsxExpressionAttribute";
+  value: string;
+}
+
+export type MdxAttribute = MdxJsxAttribute | MdxJsxExpressionAttribute;
+
+function codeAtom(name: string, dataAttr: string) {
+  return Node.create({
+    name,
+    group: "block",
+    atom: true,
+    selectable: true,
+    draggable: false,
+    addAttributes: () => ({ value: { default: "" } }),
+    parseHTML: () => [{ tag: `pre[${dataAttr}]` }],
+    renderHTML({ node, HTMLAttributes }) {
+      return [
+        "pre",
+        mergeAttributes(HTMLAttributes, { [dataAttr]: "" }),
+        ["code", {}, String(node.attrs.value)],
+      ];
+    },
+  });
+}
+
+/** an `{expression}` at block level, including MDX comments */
+export const MdxFlowExpression = codeAtom("mdxFlowExpression", "data-mdx-expression");
+
+/** `import`/`export` statements */
+export const MdxjsEsm = codeAtom("mdxjsEsm", "data-mdx-esm");
+
+/** YAML frontmatter, edited in place as code */
+export const Frontmatter = Node.create({
+  name: "frontmatter",
+  group: "block",
+  content: "text*",
+  marks: "",
+  code: true,
+  defining: true,
+  draggable: false,
+  parseHTML: () => [{ tag: "pre[data-mdx-frontmatter]", preserveWhitespace: "full" }],
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "pre",
+      mergeAttributes(HTMLAttributes, { "data-mdx-frontmatter": "" }),
+      ["code", {}, 0],
+    ];
+  },
+});
+
+/** Block-level source the converter doesn't model; preserved byte-for-byte. */
+export const VerbatimBlock = codeAtom("verbatim", "data-mdx-verbatim");
+
+/** `{expression}` inside a paragraph */
+export const MdxTextExpression = Node.create({
+  name: "mdxTextExpression",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes: () => ({ value: { default: "" } }),
+  parseHTML: () => [{ tag: "code[data-mdx-expression]" }],
+  renderHTML({ node }) {
+    return ["code", { "data-mdx-expression": "" }, `{${String(node.attrs.value)}}`];
+  },
+});
+
+/** Inline source the converter doesn't model (e.g. footnote references). */
+export const VerbatimInline = Node.create({
+  name: "verbatimInline",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes: () => ({ value: { default: "" } }),
+  parseHTML: () => [{ tag: "code[data-mdx-verbatim]" }],
+  renderHTML({ node }) {
+    return ["code", { "data-mdx-verbatim": "" }, String(node.attrs.value)];
+  },
+});
+
+export const mdxNodes = [
+  MdxJsxFlowElement,
+  MdxJsxTag,
+  MdxJsxTagBlock,
+  MdxFlowExpression,
+  MdxTextExpression,
+  MdxjsEsm,
+  Frontmatter,
+  VerbatimBlock,
+  VerbatimInline,
+];

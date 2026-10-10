@@ -1,0 +1,42 @@
+---
+title: Providers
+icon: ImagePlus
+description: Where uploads go and which files documents can reference
+---
+
+The editor runs in the browser, so it cannot know where to store a pasted
+image or which pages exist. Your app tells it through two props:
+
+| Prop    | Enables                                     | Without it              |
+| ------- | ------------------------------------------- | ----------------------- |
+| `media` | pasting and dropping images                 | images are added by URL |
+| `files` | autocomplete for `<include>` and `[[` links | paths are typed by hand |
+
+## Media
+
+<include meta='title="providers.tsx"'>../examples/providers.tsx#media</include>
+
+- `upload` stores the file and returns the `src` written into the document.
+- `resolve` turns a document `src` into a URL the browser can display.
+- `onError` receives the error and the file when `upload` rejects, so your app
+  can show it.
+
+<Callout title="With sync">
+The sync server has an upload endpoint, storing files in `<root>/assets`:
+
+<include meta='title="dev-media.tsx"'>../examples/providers-dev.tsx</include>
+
+It accepts `image/*` up to 10 MiB by default; change it with the server's
+`upload` option. With [auth](/auth#media-uploads), uploads need `write`.
+
+</Callout>
+
+## Files
+
+<include meta='title="providers.tsx"'>../examples/providers.tsx#files</include>
+
+Return paths exactly as they should be written into the document, relative
+to the open one (for example `./shared/props.mdx`).
+
+With [sync](/sync), build the list from the pages of
+[`useWorkspace().tree`](/file-tree).

@@ -1,0 +1,29 @@
+import type { Root } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { mdxFromMarkdown } from "mdast-util-mdx";
+import { gfmFromMarkdown } from "mdast-util-gfm";
+import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
+import { mdxjs } from "micromark-extension-mdxjs";
+import { gfm } from "micromark-extension-gfm";
+import { frontmatter } from "micromark-extension-frontmatter";
+import { directive, directiveFromMarkdown } from "../syntax/directives/parse";
+import { math, mathFromMarkdown } from "../syntax/math/parse";
+import type { SyntaxOptions } from "../components/spec";
+
+/**
+ * Parse MDX source into mdast with MDX, GFM and YAML frontmatter syntax,
+ * plus whatever dialects `options` enables.
+ */
+export function parseMdx(source: string, options: SyntaxOptions = {}): Root {
+  const extensions = [mdxjs(), gfm(), frontmatter(["yaml"])];
+  const mdastExtensions = [mdxFromMarkdown(), gfmFromMarkdown(), frontmatterFromMarkdown(["yaml"])];
+  if (options.directives) {
+    extensions.push(directive());
+    mdastExtensions.push(directiveFromMarkdown());
+  }
+  if (options.math) {
+    extensions.push(math());
+    mdastExtensions.push(mathFromMarkdown());
+  }
+  return fromMarkdown(source, { extensions, mdastExtensions });
+}

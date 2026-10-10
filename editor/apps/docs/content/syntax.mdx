@@ -1,0 +1,76 @@
+---
+title: Syntax
+icon: Braces
+description: Dialects, feature switches and the verbatim fallback
+---
+
+Two props decide what the editor understands:
+
+- `components`: the component [specs](/components)
+- `syntax`: switches for Markdown dialects
+
+JSX without a spec keeps its children editable, with its tags edited as
+text. Anything else is kept **verbatim**: it round-trips byte-for-byte and is
+edited as source. Turning a feature off never breaks a document.
+
+<include meta='title="editor.tsx"'>../examples/syntax.tsx</include>
+
+## Options
+
+| Option            | Default                      | Turns on                         |
+| ----------------- | ---------------------------- | -------------------------------- |
+| `headingSuffixes` | `true`                       | `[#id]` and `[!toc]` on headings |
+| `math`            | `false`                      | `$…$` and `$$…$$` TeX math       |
+| `directives`      | `true` with `admonitionSpec` | `:::` admonitions                |
+
+Dialects are off by default because they change how existing text parses:
+with `math` on, `$5 and $10` becomes a formula.
+
+## Dialects
+
+<Accordions>
+<Accordion title="Heading suffixes">
+
+`## Title [#custom-id]`, `[!toc]` and `[toc]` show as chips on the heading
+instead of text. Change them from the block menu.
+
+</Accordion>
+<Accordion title="Math">
+
+`$x^2$` and `$$…$$` are edited as TeX with a live KaTeX preview. KaTeX only
+loads when the first formula appears.
+
+</Accordion>
+<Accordion title="Directive admonitions">
+
+Register `admonitionSpec` to edit `:::warn[Title]` blocks like a Callout.
+They stay `:::` in the file, and `<Callout>` stays JSX.
+
+</Accordion>
+<Accordion title="Files fences">
+
+Register `filesFenceSpecs` to edit ` ```files ` fences with the same UI as
+`<Files>`.
+
+</Accordion>
+<Accordion title="Mermaid">
+
+A `mermaid` code block renders its diagram below the source. Nothing to
+turn on.
+
+</Accordion>
+<Accordion title="Code block tabs">
+
+Consecutive fences with a `tab="…"` meta are one tab group, as in
+[fumadocs](https://fumadocs.dev/docs/ui/markdown#codeblock-tabs). The editor
+draws them as one box with an editable label per tab: `⌘Enter` in a tab adds
+the next one, and a code block's `⚙` menu has **Add tab** and the raw meta
+string.
+
+</Accordion>
+</Accordions>
+
+## Not yet editable
+
+Explicit `<CodeBlockTabs>`, non-fumadocs `<Tabs>` and footnotes are kept
+verbatim for now.

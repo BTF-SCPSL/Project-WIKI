@@ -1,0 +1,59 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "playground",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/playground", "dev", "--port", "5173"],
+      "port": 5173
+    },
+    {
+      "name": "playground-lan",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/playground", "dev", "--port", "5174", "--host"],
+      "port": 5174
+    },
+    {
+      "name": "playground-collab",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/playground", "dev", "--port", "5273"],
+      "port": 5273
+    },
+    {
+      "name": "playground-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/playground", "dev", "--port", "5373"],
+      "port": 5373
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/docs", "dev", "--port", "3801"],
+      "port": 3801
+    },
+    {
+      "name": "docs-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/docs", "dev", "--port", "3802"],
+      "port": 3802
+    },
+    {
+      "name": "playground-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/playground", "exec", "vite", "preview", "--port", "4173"],
+      "port": 4173
+    },
+    {
+      "name": "studio",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "playground", "studio", "--port", "5200", "--no-open"],
+      "port": 5200
+    },
+    {
+      "name": "studio-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "playground", "studio", "--port", "5201", "--no-open"],
+      "port": 5201
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "fumadocs-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "studio": "pnpm --filter playground studio",
+    "lint": "oxlint",
+    "lint:format": "oxfmt --check",
+    "format": "oxfmt",
+    "test": "vitest",
+    "types:check": "turbo run types:check",
+    "tegami": "node scripts/tegami.mts",
+    "bench": "vitest bench --run --project @fumadocs-editor/core"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.69.0",
+    "tegami": "^1.4.0",
+    "tinyexec": "^1.2.4",
+    "turbo": "^2.9.18",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.5.3"
+}

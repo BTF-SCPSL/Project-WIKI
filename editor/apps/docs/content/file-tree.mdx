@@ -1,0 +1,47 @@
+---
+title: File tree
+icon: FolderTree
+description: The sidebar as an editor for pages, folders and meta.json
+---
+
+`FileTree` shows the synced directory like a Fumadocs sidebar, and lets you
+create, delete and reorder pages. Every change is written to disk, so the
+site's navigation follows.
+
+<include meta='title="workspace.tsx"'>../examples/file-tree.tsx</include>
+
+`useWorkspace` shares the editors' connection. If you created your own
+[sync client](/sync#sync-client), pass it as `useWorkspace({ client })`.
+
+## What it edits
+
+| Action     | On disk                                   |
+| ---------- | ----------------------------------------- |
+| New page   | `<slug>.mdx` with a frontmatter `title`   |
+| New folder | `<slug>/meta.json` and `<slug>/index.mdx` |
+| Reorder    | the folder's `pages` in `meta.json`       |
+| Delete     | the file, and its `pages` entry           |
+
+- A name typed as `Guides/Getting started` nests: it creates
+  `guides/getting-started.mdx`.
+- A folder without a `meta.json`, or whose `pages` ends in `...`, lists new
+  pages automatically.
+
+## Keyboard
+
+| Keys                 | Does                           |
+| -------------------- | ------------------------------ |
+| `↑` `↓` `Home` `End` | Move between rows              |
+| `←` `→`              | Close or open a folder         |
+| `Alt+↑` `Alt+↓`      | Move the row within its folder |
+| `Enter` / `Escape`   | Create or cancel a new row     |
+
+On touch screens, drag rows by their grip.
+
+## Props
+
+<auto-type-table path="../../../packages/ui/src/file-tree/file-tree.tsx" name="FileTreeProps" />
+
+<Callout title="Permissions">
+  The tree only lists the pages a user may [read](/auth), and refuses changes they may not write.
+</Callout>

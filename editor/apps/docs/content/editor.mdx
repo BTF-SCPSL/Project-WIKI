@@ -1,0 +1,82 @@
+---
+title: MdxEditor
+icon: BookOpen
+description: Props, ref, parts and keyboard shortcuts
+---
+
+```tsx
+import { MdxEditor } from "@fumadocs-editor/ui";
+```
+
+## Props
+
+<auto-type-table path="../../../packages/ui/src/editor.tsx" name="MdxEditorProps" />
+
+### `sync`
+
+See [Sync](/sync).
+
+<auto-type-table path="../../../packages/ui/src/store.ts" name="MdxEditorSync" />
+
+## Ref
+
+<auto-type-table path="../../../packages/ui/src/store.ts" name="MdxEditorRef" />
+
+## Page variant
+
+`variant="page"` makes the editor fill the page, with a sticky header and a
+centered column. `header` adds your own controls to it. [Studio](/studio)
+is built this way.
+
+<include meta='title="page.tsx"'>../examples/page-variant.tsx</include>
+
+| CSS variable       | Default | Sets                                            |
+| ------------------ | ------- | ----------------------------------------------- |
+| `--fde-page-width` | `52rem` | the column width                                |
+| `--fde-page-inset` | `0px`   | space kept clear at the start, for a side panel |
+
+## Parts
+
+`MdxEditor` shows one surface at a time with tabs to switch. For another
+layout, compose the parts:
+
+<include meta='title="split.tsx"'>../examples/parts.tsx</include>
+
+| Part               | Renders                                           |
+| ------------------ | ------------------------------------------------- |
+| `MdxEditor.Root`   | nothing; owns the document, takes the props above |
+| `MdxEditor.Visual` | the WYSIWYG surface                               |
+| `MdxEditor.Source` | the MDX source                                    |
+| `MdxEditor.Status` | the sync status and conflict buttons              |
+| `MdxEditor.Tabs`   | the Visual / MDX switch                           |
+
+For fully custom surfaces, read the document with `useSourceText`,
+`useSyncStatus` and `useEditorMode` inside `MdxEditor.Root`.
+
+## Keyboard
+
+| Keys                 | Does                                                   |
+| -------------------- | ------------------------------------------------------ |
+| `⌘B` `⌘I` `⌘E` `⌘⇧S` | bold, italic, code, strikethrough                      |
+| `→` at a line's end  | stop the current formatting                            |
+| `⌘.`                 | open the block menu                                    |
+| `⌥↑` `⌥↓`            | move the block                                         |
+| `Esc`                | select the component around the caret, then its parent |
+| `⌘A`                 | select the region, then wider, then everything         |
+| `Tab` `⇧Tab`         | next or previous region of a component                 |
+| `⌘Enter`             | add the next item (a Step, Tab, File or code tab)      |
+
+- **Mouse:** double-click a component's border or icon to select it, then drag
+  its handle to move it.
+- **Touch:** the toolbar stays visible while typing, and each block has a
+  drag handle beside it.
+
+## EditorThemeProvider
+
+For pages without their own theme: tracks `light`, `dark` or `system`,
+remembers the choice and applies it to the editor. Read or change it with
+`useEditorTheme()`.
+
+<include meta='title="standalone.tsx"'>../examples/theming.tsx</include>
+
+<auto-type-table path="../../../packages/ui/src/theme.tsx" name="EditorThemeProviderProps" />

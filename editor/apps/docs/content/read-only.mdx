@@ -1,0 +1,25 @@
+---
+title: Read-only
+icon: Eye
+description: Show a document without letting it change
+---
+
+`editable={false}` makes the editor read-only:
+
+- no typing, no slash menu, no block menus
+- selection and copy still work
+- the MDX source tab is read-only too
+
+You can flip it at any time without remounting the editor.
+
+## With auth
+
+When the server's [scope](/auth) denies `write`, `sync.onOpen` reports
+`writable: false`. Pass it to `editable`:
+
+<include meta='title="scoped-editor.tsx"'>../examples/read-only.tsx</include>
+
+<Callout type="info" title="Not a security boundary">
+  `editable` only changes the UI. The server refuses writes from a read-only user even if they
+  tamper with the client.
+</Callout>
