@@ -1,0 +1,82 @@
+{
+  "_comment": "BTF Fumadocs Wiki and BTF OIDC Editor, single port.",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-10-10T00:00:00+00:00",
+  "name": "BTF Wiki Unified",
+  "author": "BTF-SCPSL",
+  "description": "Wiki + Editor + BTF OIDC through one port.",
+  "features": null,
+  "docker_images": {
+    "BTF Wiki Unified": "ghcr.io/btf-scpsl/project-wiki-unified:latest"
+  },
+  "file_denylist": [],
+  "startup": "node /opt/btf-runtime/launch.mjs",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\":[\"BTF Wiki and protected Editor listening on\"]}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\nset -e\nmkdir -p /mnt/server/content\n",
+      "container": "ghcr.io/pterodactyl/installers:debian",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "BTF OIDC Issuer",
+      "env_variable": "BTF_OIDC_ISSUER",
+      "default_value": "",
+      "description": "Public BTF API OIDC issuer HTTPS URL with trailing slash",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:255",
+      "field_type": "text"
+    },
+    {
+      "name": "BTF OIDC Client ID",
+      "env_variable": "BTF_OIDC_CLIENT_ID",
+      "default_value": "",
+      "description": "OIDC confidential client ID from BTF admin panel",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:255",
+      "field_type": "text"
+    },
+    {
+      "name": "BTF OIDC Client Secret",
+      "env_variable": "BTF_OIDC_CLIENT_SECRET",
+      "default_value": "",
+      "description": "Secret server-side only",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:512",
+      "field_type": "text"
+    },
+    {
+      "name": "Wiki Public URL",
+      "env_variable": "BTF_EDITOR_PUBLIC_URL",
+      "default_value": "https://wiki.backtofuture.fun",
+      "description": "HTTPS Wiki origin",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|string|max:255",
+      "field_type": "text"
+    },
+    {
+      "name": "Internal signing secret",
+      "env_variable": "BTF_EDITOR_BRIDGE_SECRET",
+      "default_value": "",
+      "description": "Random 64 hexadecimal character secret",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|min:32|max:512",
+      "field_type": "text"
+    }
+  ]
+}
