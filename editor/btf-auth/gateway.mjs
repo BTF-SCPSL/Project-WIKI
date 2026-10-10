@@ -137,7 +137,7 @@ async function handle(req, res) {
     temporary.sub = info.sub;
     const sessionId = randomToken();
     sessions.set(hashToken(sessionId), { ...temporary, expires: Date.now() + Math.min(lifeMs, Math.max(60, Number(token.expires_in) || 900) * 1000) });
-    return redirect(res, '/', { 'set-cookie': [cookie(sessionId, 8 * 60 * 60), clearFlowCookie()] });
+    return redirect(res, '/editor', { 'set-cookie': [cookie(sessionId, 8 * 60 * 60), clearFlowCookie()] });
   }
   if (path.pathname === '/auth/logout') {
     if (req.method !== 'POST') return send(res, 405, 'Method not allowed');
