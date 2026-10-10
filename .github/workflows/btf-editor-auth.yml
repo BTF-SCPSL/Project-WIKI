@@ -1,0 +1,31 @@
+name: BTF Editor authentication tests
+
+on:
+  pull_request:
+    paths:
+      - 'editor/btf-auth/**'
+      - '.github/workflows/btf-editor-auth.yml'
+  push:
+    branches: [feat/btf-editor-oidc]
+    paths:
+      - 'editor/btf-auth/**'
+      - '.github/workflows/btf-editor-auth.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax validation
+        run: |
+          node --check editor/btf-auth/gateway.mjs
+          node --check editor/btf-auth/helpers.mjs
+          node --check editor/btf-auth/studio.server.mjs
+      - name: Auth and authorization unit tests
+        run: node --test editor/btf-auth/test/*.test.mjs
