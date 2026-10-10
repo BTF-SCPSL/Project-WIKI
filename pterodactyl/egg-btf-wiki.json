@@ -1,0 +1,42 @@
+{
+  "_comment": "BTF Wiki for Pterodactyl; import this file via Nests -> Import Egg.",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-10-10T00:00:00+00:00",
+  "name": "BTF Wiki (Fumadocs)",
+  "author": "BTF-SCPSL",
+  "description": "Run the prebuilt BTF Wiki (Next.js + Fumadocs) from GHCR. No npm install at startup; SERVER_PORT is used automatically. Content updates require rebuilding the image.",
+  "features": null,
+  "docker_images": {
+    "BTF Wiki (Node.js 24)": "ghcr.io/btf-scpsl/project-wiki:latest"
+  },
+  "file_denylist": [],
+  "startup": "node /opt/btf-wiki/server.js",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\":[\"Ready in\",\"Listening on\"]}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\nset -e\nmkdir -p /mnt/server\necho 'BTF Wiki is packaged in the Docker image; nothing to download.'\n",
+      "container": "ghcr.io/pterodactyl/installers:debian",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Timezone",
+      "description": "Timezone for logging and date formatting.",
+      "env_variable": "TZ",
+      "default_value": "Europe/Kyiv",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:64",
+      "field_type": "text"
+    }
+  ]
+}
