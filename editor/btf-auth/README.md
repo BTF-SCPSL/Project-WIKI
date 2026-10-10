@@ -57,7 +57,7 @@ The Studio config is read by the browser; credentials must never be included in 
 - Current \`btf_role.key\` is fetched through BTF UserInfo on **every** proxied HTTP and WebSocket request. Role changes take effect on the next operation/reconnect. An existing already-open websocket must be disconnected if immediate revocation is required; currently it remains alive until disconnect.
 - Both HTTP and WebSocket traffic must go through this gateway. Studio independently validates a short-lived HMAC assertion at sync and upload boundaries.
 - Session is in memory, not yet Redis/database; restarting the gateway logs users out. There is no refresh-token support; the short-lived access token requires re-login when it expires.
-- OIDC \`state\` is one-time and expiring, but it is stored server-side without tying the callback to the initiating browser. Do not deploy this preliminary implementation to the public internet until the state-to-browser binding, logout CSRF safeguards, OIDC callback hardening, proxy route restrictions and WebSocket revocation are completed and reviewed.
+- OIDC \`state\` is one-time, short-lived and bound to the initiating browser through a secure, HttpOnly same-site cookie. Logout requires a same-origin POST. A security review and live end-to-end tests of the OIDC flow, gateway and websocket lifecycle are still required before production deployment.
 - The gateway currently does **not** replace the Fumadocs Wiki site. Published Next.js MDX pages are built separately; a file edit alone will not refresh them.
 - Persistent content must be mounted at the same path expected by the deployed wiki and studio.
 - Run \`node --test ./test/*.test.mjs\` to check role keys, signature, PKCE and origin validation.
