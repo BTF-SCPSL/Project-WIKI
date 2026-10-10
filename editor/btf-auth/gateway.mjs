@@ -17,6 +17,10 @@ const flows = new Map();
 const lifeMs = 8 * 60 * 60_000;
 const flowMs = 5 * 60_000;
 const redirectUri = origin + '/auth/callback';
+const flowCookie = origin.startsWith('https:') ? '__Host-btf_editor_flow' : 'btf_editor_flow_local';
+const cookieSuffix = '; Path=/; HttpOnly; SameSite=Lax' + (origin.startsWith('https:') ? '; Secure' : '');
+function setFlowCookie(state) { return flowCookie + '=' + state + cookieSuffix + '; Max-Age=300'; }
+function clearFlowCookie() { return flowCookie + '=' + cookieSuffix + '; Max-Age=0'; }
 
 const metadataUrl = new URL('.well-known/openid-configuration', issuer).href;
 let config;
@@ -104,15 +108,16 @@ async function handle(req, res) {
       redirect_uri:redirectUri,scope:'openid profile btf.role',state,
       code_challenge:pkceChallenge(verifier),code_challenge_method:'S256',
     })) auth.searchParams.set(k,v);
-    return redirect(res, auth.href);
+    return redirect(res, auth.href, { 'set-cookie': setFlowCookie(state) });
   }
   if (path.pathname === '/auth/callback') {
     if (req.method !== 'GET') return send(res, 405, 'Method not allowed');
     const state = path.searchParams.get('state');
     const code = path.searchParams.get('code');
-    const flow = state && flows.get(hashToken(state));
+    const browserFlow = parseCookies(req.headers.cookie ?? '').get(flowCookie);
+    const flow = state && browserFlow === state && flows.get(hashToken(state));
     if (state) flows.delete(hashToken(state));
-    if (!flow || flow.expires < Date.now() || !code || path.searchParams.has('error')) return send(res, 401, 'Ошибка входа BTF');
+    if (!flow || flow.expires < Date.now() || !code || path.searchParams.has('error')) return send(res, 401, 'Ошибка входа BTF', { 'set-cookie': clearFlowCookie() });
     const c = await discovery();
     const body = new URLSearchParams({
       grant_type:'authorization_code',client_id:process.env.BTF_OIDC_CLIENT_ID,
@@ -127,12 +132,12 @@ async function handle(req, res) {
     const temporary = { accessToken: token.access_token, sub: '' };
     const info = await jsonFetch(c.userinfo_endpoint, { headers:{ authorization:'Bearer ' + token.access_token } });
     if (typeof info.sub !== 'string' || !/^\d+$/.test(info.sub) || !isEditorRole(info.btf_role?.key)) {
-      return send(res, 403, '<h2>Доступ запрещён</h2><p>Редактор доступен только ролям «Владелец» и «Руководитель проекта».</p>');
+      return send(res, 403, '<h2>Доступ запрещён</h2><p>Редактор доступен только ролям «Владелец» и «Руководитель проекта».</p>', { 'set-cookie': clearFlowCookie() });
     }
     temporary.sub = info.sub;
     const sessionId = randomToken();
     sessions.set(hashToken(sessionId), { ...temporary, expires: Date.now() + Math.min(lifeMs, Math.max(60, Number(token.expires_in) || 900) * 1000) });
-    return redirect(res, '/', { 'set-cookie': cookie(sessionId, 8 * 60 * 60) });
+    return redirect(res, '/', { 'set-cookie': [cookie(sessionId, 8 * 60 * 60), clearFlowCookie()] });
   }
   if (path.pathname === '/auth/logout') {
     if (req.method !== 'POST') return send(res, 405, 'Method not allowed');
