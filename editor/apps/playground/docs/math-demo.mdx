@@ -1,0 +1,35 @@
+---
+title: Math demo
+---
+
+# Math
+
+Inline math like $E = mc^2$ sits in a sentence, and display-style inline
+$$c = \pm\sqrt{a^2 + b^2}$$ keeps its double dollars.
+
+$$
+T_{f}(z)=\sum _{k=0}^{\infty }{\frac {(z-c)^{k}}{2\pi i}}\int _{\gamma }{\frac {f(w)}{(w-c)^{k+1}}}\,dw
+$$
+
+Prices like $5 stay editable as prose once escaped.
+
+## Diagram
+
+```mermaid
+graph TD;
+  A[Edit fence] --> B{Valid?};
+  B -- yes --> C[Render diagram];
+  B -- no --> D[Keep last good];
+```
+
+## Layout
+
+```files
+project
+├── src
+│   ├── index.js
+│   └── utils
+│       └── helper.js
+├── package.json
+└── assets/
+```

@@ -1,0 +1,70 @@
+import { afterEach, expect } from "vitest";
+import { Editor } from "@tiptap/core";
+import {
+  createSyntax,
+  editorExtensions,
+  parseMdxToDoc,
+  serializeDocToMdx,
+} from "@fumadocs-editor/core";
+import { componentKeymap } from "../src/components/keymap";
+import { caretPolicy } from "../src/components/caret-policy";
+import { structureGuard } from "../src/components/structure";
+import { fumadocsUiComponents } from "../src/components/fumadocs-ui";
+import { specsByType } from "../src/components/spec";
+
+export const syntax = createSyntax(fumadocsUiComponents);
+export const specs = specsByType(fumadocsUiComponents);
+
+// prosemirror-view's DOMObserver schedules a 20ms flush from stop() that reads
+// the global `document`; vitest deletes it on jsdom teardown, so a view left
+// alive at the end of a file throws an unhandled error on slow (CI) runners
+const live: Editor[] = [];
+
+/** destroy `editor` after the current test */
+export function track<T extends Editor>(editor: T): T {
+  live.push(editor);
+  return editor;
+}
+
+afterEach(() => {
+  for (const editor of live.splice(0)) editor.destroy();
+});
+
+export function makeEditor(mdx: string) {
+  const { doc, snapshot } = parseMdxToDoc(mdx, syntax);
+  const editor = track(
+    new Editor({
+      element: document.createElement("div"),
+      extensions: [
+        ...editorExtensions({ components: fumadocsUiComponents }),
+        ...componentKeymap(specs),
+        structureGuard(specs),
+        caretPolicy,
+      ],
+      content: doc,
+    }),
+  );
+  void editor.view; // the view (and plugin view hooks) mount lazily
+  // serialized output must always reparse: structural moves may never emit invalid MDX
+  const serialize = () => {
+    const out = serializeDocToMdx(editor.getJSON(), snapshot, syntax);
+    expect(() => parseMdxToDoc(out, syntax)).not.toThrow();
+    return out;
+  };
+  return { editor, serialize };
+}
+
+/** place the caret right after (or at the start of) the first occurrence of `text` */
+export function caret(editor: Editor, text: string, at: "start" | "end" = "end") {
+  let pos = -1;
+  editor.state.doc.descendants((node, nodePos) => {
+    if (pos !== -1) return false;
+    if (node.isText && node.text!.includes(text)) {
+      const index = node.text!.indexOf(text);
+      pos = nodePos + index + (at === "end" ? text.length : 0);
+    }
+  });
+  if (pos === -1) throw new Error(`text not found: ${text}`);
+  editor.commands.setTextSelection(pos);
+  return pos;
+}

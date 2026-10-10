@@ -1,0 +1,78 @@
+---
+title: Component Editing
+description: MDX components rendered as real components with editable regions
+---
+
+# Editing MDX components
+
+Registered components render as the real component, and each editable area
+is a proper region. Type `/` on an empty line to insert blocks and components.
+
+<Callout type="warn" title="Heads up">
+  This callout's title and body are both editable. Click the icon to change its **type**, or press
+  `Cmd-.` to open the options behind the ⋯ handle.
+</Callout>
+
+Code fences highlight as you type, and the language is one click away:
+
+```typescript title="editor.ts"
+import { MdxEditor } from "@fumadocs-editor/ui";
+
+export function render(value: string) {
+  const editor = new MdxEditor({ defaultValue: value });
+  return editor.getMarkdown();
+}
+```
+
+Cards decompose into structured, editable items. Select some text to get the
+formatting bubble; its component chip edits the card's link and other props:
+
+<Cards>
+  <Card title="Getting Started" href="/docs">
+    Set up your first project.
+  </Card>
+  <Card title="Components" href="/docs/components">
+    Browse the component library.
+  </Card>
+</Cards>
+
+Steps keep their numbered rail. `Cmd-Enter` starts the next one:
+
+<Steps>
+  <Step>
+    ### Install the package
+
+    Add `@fumadocs-editor/ui` to your project.
+
+  </Step>
+  <Step>
+    ### Mount the editor
+
+    Drop `<MdxEditor />` into any client component.
+
+  </Step>
+</Steps>
+
+File trees are built like a list: `Enter` adds a row, `Tab` toggles it into a
+folder, `Alt-arrows` reorder, and the icons are drag handles:
+
+<Files>
+  <Folder name="app">
+    <File name="layout.tsx" />
+    <File name="page.tsx" />
+  </Folder>
+  <File name="package.json" />
+</Files>
+
+Accordions render every panel open so answers stay editable:
+
+<Accordions>
+  <Accordion title="Does it round-trip losslessly?">
+    Yes. Unedited blocks serialize back byte-for-byte.
+  </Accordion>
+  <Accordion title="Can I add my own components?">
+    Register a spec and a renderer.
+  </Accordion>
+</Accordions>
+
+Unedited blocks round-trip byte-for-byte.

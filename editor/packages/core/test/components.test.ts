@@ -1,0 +1,150 @@
+import { describe, expect, test } from "vitest";
+import { createSyntax, parseMdxToDoc, serializeDocToMdx, type ComponentSpec } from "../src";
+import type { JSONContent } from "@tiptap/core";
+
+const calloutSpec: ComponentSpec = {
+  name: "Callout",
+  attributeRegions: [{ attribute: "title", region: "title" }],
+  childrenRegion: { region: "body" },
+  props: [{ name: "type", type: "enum", options: ["info", "warn", "error"] }],
+};
+
+const cardSpec: ComponentSpec = {
+  name: "Card",
+  attributeRegions: [{ attribute: "title", region: "title" }],
+  // `description` renders into the same slot as children, so it folds into body
+  childrenRegion: { region: "body", fromAttribute: "description" },
+};
+
+const cardsSpec: ComponentSpec = { name: "Cards", childComponent: "Card" };
+
+const syntax = createSyntax([calloutSpec, cardSpec, cardsSpec]);
+
+function find(node: JSONContent, type: string): JSONContent | undefined {
+  if (node.type === type) return node;
+  for (const child of node.content ?? []) {
+    const found = find(child, type);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+describe("component regions", () => {
+  test("Callout parses into title + body regions", () => {
+    const source = '<Callout type="info" title="Heads up">\n  Body **text**.\n</Callout>\n';
+    const { doc } = parseMdxToDoc(source, syntax);
+
+    const [title, body] = find(doc, "Callout")!.content!;
+    expect(title.type).toBe("mdxInlineRegion");
+    expect(title.content?.[0].text).toBe("Heads up");
+    expect(body.type).toBe("mdxBlockRegion");
+  });
+
+  test("unedited Callout round-trips byte-for-byte", () => {
+    const source = '<Callout type="info" title="Heads up">\n  Body text.\n</Callout>\n';
+    const { doc, snapshot } = parseMdxToDoc(source, syntax);
+    expect(serializeDocToMdx(doc, snapshot, syntax)).toBe(source);
+  });
+
+  test("editing the title region rewrites only the title attribute", () => {
+    const source = '<Callout type="warn" title="Old">\n  Body.\n</Callout>\n';
+    const { doc, snapshot } = parseMdxToDoc(source, syntax);
+
+    // edit a clone: editor edits produce fresh JSON, never mutate the parsed doc
+    const edited = structuredClone(doc);
+    find(edited, "Callout")!.content![0].content = [{ type: "text", text: "New title" }];
+
+    const out = serializeDocToMdx(edited, snapshot, syntax);
+    expect(out).toContain('title="New title"');
+    expect(out).toContain('type="warn"');
+    expect(out).toContain("Body.");
+  });
+
+  test("Cards → Card nesting round-trips", () => {
+    const source =
+      '<Cards>\n  <Card title="A" href="/a">First</Card>\n  <Card title="B">Second</Card>\n</Cards>\n';
+    const { doc, snapshot } = parseMdxToDoc(source, syntax);
+
+    const cards = find(doc, "Cards")!.content!;
+    expect(cards.map((card) => card.type)).toEqual(["Card", "Card"]);
+    expect(cards[0].content![0].content?.[0].text).toBe("A");
+
+    expect(serializeDocToMdx(doc, snapshot, syntax)).toBe(source);
+  });
+
+  test("a child-only component outside its parent stays generic JSX", () => {
+    const { doc } = parseMdxToDoc('<Card title="Loose" />\n', syntax);
+    expect(doc.content![0].type).toBe("mdxJsxTagBlock");
+    expect(doc.content![0].content![0].text).toBe('<Card title="Loose" />');
+  });
+
+  test("Card description folds into the editable body region", () => {
+    const source =
+      '<Cards>\n<Card title="Themes" description="Add themes to your site" />\n</Cards>\n';
+    const { doc } = parseMdxToDoc(source, syntax);
+
+    const card = find(doc, "Card")!;
+    // description is edited as body text, not kept as a separate attribute
+    const body = card.content![1];
+    expect(body.type).toBe("mdxBlockRegion");
+    expect(find(body, "paragraph")?.content?.[0].text).toBe("Add themes to your site");
+    const attrNames = (card.attrs!.attributes as { name?: string }[]).map((a) => a.name);
+    expect(attrNames).not.toContain("description");
+    expect(attrNames).toContain("title");
+  });
+
+  test("unedited description Card round-trips byte-for-byte", () => {
+    const source =
+      '<Cards>\n<Card title="Themes" description="Add themes to your site" />\n</Cards>\n';
+    const { doc, snapshot } = parseMdxToDoc(source, syntax);
+    expect(serializeDocToMdx(doc, snapshot, syntax)).toBe(source);
+  });
+
+  test("editing a folded-description body re-emits it as children", () => {
+    const source = '<Cards>\n<Card title="Themes" description="Old copy" />\n</Cards>\n';
+    const { doc, snapshot } = parseMdxToDoc(source, syntax);
+
+    const edited = structuredClone(doc);
+    find(edited, "Card")!.content![1].content = [
+      { type: "paragraph", content: [{ type: "text", text: "New copy" }] },
+    ];
+
+    const out = serializeDocToMdx(edited, snapshot, syntax);
+    expect(out).toContain("New copy");
+    expect(out).not.toContain("description=");
+    expect(out).toContain('title="Themes"');
+  });
+
+  test("normalized serialization is idempotent for components", () => {
+    const source = '<Callout title="Hi">\nText here.\n</Callout>';
+    const { doc } = parseMdxToDoc(source, syntax);
+    const once = serializeDocToMdx(doc, undefined, syntax);
+    const twice = serializeDocToMdx(parseMdxToDoc(once, syntax).doc, undefined, syntax);
+    expect(twice).toBe(once);
+  });
+});
+
+describe("expression attribute literals", () => {
+  const attrValue = (source: string) => {
+    const { doc } = parseMdxToDoc(source, createSyntax([{ name: "TypeTable" }]));
+    let value: unknown;
+    const walk = (node: JSONContent) => {
+      if (node.attrs?.attributes) value = (node.attrs.attributes as { value: unknown }[])[0].value;
+      for (const child of node.content ?? []) walk(child);
+    };
+    walk(doc);
+    return value as { value: string; literal?: unknown };
+  };
+
+  test("static object expressions carry their literal value", () => {
+    const value = attrValue(
+      '<TypeTable type={{ name: { type: "string", required: true }, size: -2 }} />\n',
+    );
+    expect(value.literal).toEqual({ name: { type: "string", required: true }, size: -2 });
+  });
+
+  test("dynamic expressions stay literal-free", () => {
+    expect(attrValue("<TypeTable type={{f}} />\n").literal).toBeUndefined();
+    expect(attrValue("<TypeTable type={props.type} />\n").literal).toBeUndefined();
+  });
+});

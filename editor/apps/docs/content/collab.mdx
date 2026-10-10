@@ -1,0 +1,51 @@
+---
+title: Collaboration
+icon: Users
+description: Real-time collaborative editing over the sync server
+---
+
+Collaboration runs on the same [sync server](/sync). Turn it on for a
+[sync client](/sync#sync-client) and pass that client to your editors:
+
+<include meta='title="collab-editor.tsx"'>../examples/collab.tsx</include>
+
+- `user` is the name and color shown at your caret on other screens.
+  `collab: true` joins as a guest.
+- Yjs only loads when the first document opens.
+
+## Sync vs. collab
+
+With collab on, the server holds one shared document per file and is the
+only one writing it to disk.
+
+|                 | Sync                           | Collab                  |
+| --------------- | ------------------------------ | ----------------------- |
+| Saved by        | each editor                    | the server              |
+| Changes on disk | merged, conflicts need a click | merged, the editor wins |
+| Undo            | full history                   | your own edits only     |
+| MDX source tab  | available                      | disabled                |
+
+Sync and collab editors can open the same file. A sync save reaches collab
+editors like any other change on disk.
+
+## Restarts
+
+The file is the only persistence. When the server restarts, the document is
+rebuilt from disk:
+
+- edits made while the server was down are discarded
+- edits made while only the network was down are kept and sent on reconnect
+- a hard kill can lose the last second of edits; a normal shutdown saves them
+
+## Without `MdxEditor`
+
+On a collab client, [`client.open`](/sync#without-mdxeditor) joins the
+shared document. `document.collab()` returns its binding once synced:
+
+<auto-type-table path="../../../packages/core/src/sync/collab.ts" name="CollabBinding" />
+
+- Pass the same `components` and `syntax` as your editor to `client.open`;
+  the server parses the file with them.
+- The binding is `null` until the first sync and while the server rebuilds
+  the document. Rebuild your editor whenever `document.subscribe` fires.
+- `extensions()` brings its own undo: turn off StarterKit's `undoRedo`.

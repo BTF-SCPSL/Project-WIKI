@@ -1,0 +1,103 @@
+---
+title: Quick Start
+icon: Rocket
+description: A WYSIWYG editor for Fumadocs MDX
+---
+
+<Callout type="warn" title="Experimental">
+  This project is still in early stage, breaking changes expected for future v1 release.
+</Callout>
+
+Fumadocs Editor turns an MDX file into an editable page. The file stays the
+source of truth: blocks you did not touch serialize byte-for-byte, so a
+one-line edit is a one-line diff.
+
+<EditorDemo />
+
+## Installation
+
+<Callout title="Try it without code">
+  `npx @fumadocs-editor/studio` opens an editor for a Fumadocs app from the terminal. See
+  [Studio](/studio).
+</Callout>
+
+<Steps>
+<Step>
+
+### Install the package
+
+```npm
+npm install @fumadocs-editor/ui
+```
+
+</Step>
+<Step>
+
+### Add the styles
+
+```css title="app.css"
+@import "@fumadocs-editor/ui/styles.css";
+```
+
+</Step>
+<Step>
+
+### Render it
+
+<include meta='title="editor.tsx"'>../examples/quick-start.tsx</include>
+
+- `defaultValue` is the initial MDX. After that the editor is uncontrolled,
+  like `<textarea defaultValue>`.
+- `onChange` receives the serialized MDX, debounced.
+
+</Step>
+</Steps>
+
+<Callout type="info">
+  The editor is a React 19 client component. In a server-rendered app, mount it from a `'use
+  client'` file.
+</Callout>
+
+## What is editable
+
+- **Markdown:** prose, lists, tables, code blocks (a `mermaid` fence also
+  renders its diagram) and frontmatter.
+- **fumadocs-ui components:** Callout, Cards, Tabs, Steps, Accordions, Files,
+  TypeTable, GithubInfo and `<include>`, each with a slash-menu entry and
+  an attributes panel.
+- **Other JSX** keeps its children editable, and its tags are edited as
+  text. A [spec](/components) makes your own components fully editable.
+- **Anything else** is kept verbatim and edited as source.
+
+## Theming
+
+The editor follows a `.dark` class on any ancestor, so a Fumadocs or
+`next-themes` site needs no setup. To match your site's colors, alias the
+`--fde-*` tokens after the import:
+
+```css title="app.css"
+:root {
+  --fde-background: var(--color-fd-background);
+  --fde-primary: var(--color-fd-primary);
+}
+```
+
+On a page without a theme, wrap the editor in
+[`EditorThemeProvider`](/editor#editorthemeprovider).
+
+## Next steps
+
+<Cards>
+  <Card title="Sync" href="/sync">
+    Save to files on disk, with autosave and live merge.
+  </Card>
+  <Card title="Component authoring" href="/components">
+    Make your own MDX components editable in place.
+  </Card>
+  <Card title="Syntax" href="/syntax">
+    Math, directive admonitions and other dialects.
+  </Card>
+  <Card title="MdxEditor reference" href="/editor">
+    Every prop, the ref and the keyboard shortcuts.
+  </Card>
+</Cards>

@@ -1,0 +1,39 @@
+---
+title: Writing
+description: A second document for the file sidebar
+---
+
+# Writing in the mirror
+
+This file lives on disk at `docs/writing.mdx`. Edits here autosave back to
+the file, and edits made in your IDE flow into the editor as you type.
+
+## Try it [#try-it]
+
+- Edit this list in the editor and watch the file change.
+- Edit the file in your IDE and watch the editor follow.
+- Edit the *same paragraph* in both to see the conflict chip.
+
+A **closing** paragraph, so there is something below the list.
+
+## Components
+
+<Tabs items={["npm", "pnpm", "bun"]} groupId="pkg">
+  <Tab>Run `npm install fumadocs`.</Tab>
+  <Tab>Run `pnpm add fumadocs`.</Tab>
+  <Tab>Run `bun add fumadocs`.</Tab>
+</Tabs>
+
+```bash tab="npm"
+npm install fumadocs
+```
+
+```bash tab="pnpm"
+pnpm add fumadocs
+```
+
+<include lang="tsx">./snippets/hero.tsx</include>
+
+<GithubInfo owner="fuma-nama" repo="fumadocs" />
+
+<Banner variant="rainbow">Press Enter in a tab label to add another tab.</Banner>

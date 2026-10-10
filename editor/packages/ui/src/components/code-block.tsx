@@ -1,0 +1,553 @@
+"use client";
+import * as stylex from "@stylexjs/stylex";
+import { tokens } from "../styles/tokens.stylex";
+import { consts } from "../styles/consts.stylex";
+import type { Extension } from "@tiptap/core";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import {
+  NodeViewContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  type NodeViewProps,
+} from "@tiptap/react";
+import { createLowlight } from "lowlight";
+import { Popover } from "@base-ui/react/popover";
+import { Switch } from "@base-ui/react/switch";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Check, ChevronDown, Clipboard, Plus, Settings2, SquareCode } from "lucide-react";
+import type { Editor } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
+import { chrome } from "../styles/shared";
+import { BlockActions } from "../block-panel";
+import { content, contentClass } from "../styles/content";
+import { isRinged, nodeViewOptions } from "./node-view-options";
+import { Picker } from "./picker";
+import { buildCodeMeta, parseCodeMeta, type CodeMeta } from "./code-meta";
+import { MermaidDiagram } from "./mermaid";
+import { useEditorPortal } from "../utils/portal";
+
+const lowlight = createLowlight();
+
+let grammars: Promise<void> | undefined;
+const rehighlighted = new WeakSet<Editor>();
+
+function ensureGrammars(editor: Editor) {
+  grammars ??= import("./code-languages").then(({ registerLanguages }) =>
+    registerLanguages(lowlight),
+  );
+  void grammars.then(() => {
+    if (editor.isDestroyed || rehighlighted.has(editor)) return;
+    rehighlighted.add(editor);
+    // the lowlight plugin only re-decorates blocks a transaction touched, so
+    // touch every code block without changing it (and without an undo step)
+    const { state, view } = editor;
+    const tr = state.tr;
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === "codeBlock") tr.setNodeMarkup(pos, undefined, { ...node.attrs });
+    });
+    if (tr.steps.length > 0) view.dispatch(tr.setMeta("addToHistory", false));
+  });
+}
+
+const LANGUAGES: { value: string; label: string }[] = [
+  { value: "plaintext", label: "Plain text" },
+  { value: "bash", label: "Bash" },
+  { value: "typescript", label: "TypeScript" },
+  { value: "tsx", label: "TSX" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "jsx", label: "JSX" },
+  { value: "json", label: "JSON" },
+  { value: "css", label: "CSS" },
+  { value: "html", label: "HTML" },
+  { value: "markdown", label: "Markdown" },
+  { value: "mdx", label: "MDX" },
+  { value: "python", label: "Python" },
+  { value: "rust", label: "Rust" },
+  { value: "go", label: "Go" },
+  { value: "sql", label: "SQL" },
+  { value: "yaml", label: "YAML" },
+  { value: "mermaid", label: "Mermaid" },
+  { value: "npm", label: "npm command" },
+  { value: "package-install", label: "Package install" },
+];
+
+const ALIASES: Record<string, string> = {
+  ts: "typescript",
+  js: "javascript",
+  py: "python",
+  sh: "bash",
+  shell: "bash",
+  zsh: "bash",
+  yml: "yaml",
+  text: "plaintext",
+  "": "plaintext",
+};
+
+const styles = stylex.create({
+  iconButton: {
+    display: "inline-flex",
+    width: "1.5rem",
+    height: "1.5rem",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "0.375rem",
+    outline: "none",
+    color: {
+      default: tokens.mutedForeground,
+      ":hover": tokens.accentForeground,
+      ":is([data-popup-open])": tokens.accentForeground,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": tokens.accent,
+      ":is([data-popup-open])": tokens.accent,
+    },
+  },
+  languageTrigger: {
+    display: "inline-flex",
+    height: "1.5rem",
+    cursor: "pointer",
+    userSelect: "none",
+    alignItems: "center",
+    gap: "0.25rem",
+    borderRadius: "0.375rem",
+    paddingInline: "0.375rem",
+    fontSize: 12,
+    lineHeight: "1rem",
+    fontWeight: 500,
+    outline: "none",
+    color: {
+      default: tokens.mutedForeground,
+      ":hover": tokens.accentForeground,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": tokens.accent,
+      ":is([data-popup-open])": tokens.accent,
+    },
+  },
+  titleInput: {
+    height: "1.5rem",
+    minWidth: 0,
+    flex: 1,
+    backgroundColor: "transparent",
+    paddingInline: "0.375rem",
+    fontSize: tokens.fieldSize,
+    fontWeight: 500,
+    color: tokens.foreground,
+    outline: "none",
+    "::placeholder": {
+      color: `color-mix(in oklab, ${tokens.mutedForeground} 50%, transparent)`,
+    },
+  },
+  settingsPopup: {
+    display: "flex",
+    width: "13rem",
+    flexDirection: "column",
+    gap: "0.5rem",
+    padding: "0.5rem",
+  },
+  row: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    fontSize: 12.5,
+    color: tokens.foreground,
+  },
+  denseSwitch: { height: "1.125rem", width: "1.875rem" },
+  startAt: {
+    height: "1.5rem",
+    width: "3.5rem",
+    paddingInline: "0.375rem",
+    textAlign: "end",
+    fontSize: tokens.fieldSize,
+  },
+  metaField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.25rem",
+    fontSize: 12.5,
+    color: tokens.foreground,
+  },
+  metaInput: { fontFamily: consts.mono, fontSize: 11.5 },
+  actionIcon: { width: "1rem", flexShrink: 0 },
+  actions: {
+    display: "flex",
+    flexDirection: "column",
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: tokens.border,
+    paddingTop: "0.25rem",
+  },
+  actionItem: {
+    marginInline: "-0.25rem",
+    paddingInline: "0.25rem",
+    paddingBlock: "0.25rem",
+    fontSize: 12.5,
+    lineHeight: "1.125rem",
+  },
+  body: { display: "flex" },
+  pointer: { cursor: "pointer" },
+});
+
+const languageTriggerClass = stylex.props(chrome.button, styles.languageTrigger).className!;
+
+function CopyButton({ getText }: { getText: () => string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={copied ? "Copied" : "Copy code"}
+      {...stylex.props(chrome.button, styles.iconButton)}
+      tabIndex={-1}
+      onClick={() => {
+        void navigator.clipboard?.writeText(getText());
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      }}
+    >
+      {copied ? <Check size={14} /> : <Clipboard size={13} />}
+    </button>
+  );
+}
+
+function normalize(lang: string | null): string {
+  const key = (lang ?? "").toLowerCase();
+  return ALIASES[key] ?? (key || "plaintext");
+}
+
+function LanguageSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const current = normalize(value);
+  const items = LANGUAGES.some((item) => item.value === current)
+    ? LANGUAGES
+    : [{ value: current, label: current }, ...LANGUAGES];
+  const selected = items.find((item) => item.value === current);
+
+  return (
+    <Picker
+      items={items}
+      value={selected}
+      onPick={(item) => onChange(item.value)}
+      align="end"
+      ariaLabel="Code language"
+      triggerCls={languageTriggerClass}
+      triggerTabIndex={-1}
+    >
+      {selected?.label}
+      <ChevronDown size={12} />
+    </Picker>
+  );
+}
+
+function MetaSettings({
+  editor,
+  getPos,
+  raw,
+  meta,
+  updateAttributes,
+}: {
+  editor: Editor;
+  getPos: () => number | undefined;
+  raw: string | null;
+  meta: CodeMeta;
+  updateAttributes: NodeViewProps["updateAttributes"];
+}) {
+  const { anchorRef, container } = useEditorPortal();
+  const [open, setOpen] = useState(false);
+  const denseSwitch = stylex.props(chrome.switchRoot, styles.denseSwitch);
+  const thumb = stylex.props(chrome.switchThumb);
+  const onChange = (next: CodeMeta) => updateAttributes({ meta: buildCodeMeta(next) });
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
+        ref={anchorRef}
+        aria-label="Code block options"
+        tabIndex={-1}
+        {...stylex.props(chrome.button, styles.iconButton, styles.pointer)}
+      >
+        <Settings2 size={13} />
+      </Popover.Trigger>
+      <Popover.Portal container={container}>
+        <Popover.Positioner positionMethod="fixed" sideOffset={6} align="end">
+          <Popover.Popup {...stylex.props(chrome.popup, styles.settingsPopup)}>
+            <label {...stylex.props(styles.row)}>
+              Line numbers
+              <Switch.Root
+                {...denseSwitch}
+                checked={meta.lineNumbers !== false}
+                onCheckedChange={(on) => onChange({ ...meta, lineNumbers: on })}
+              >
+                <Switch.Thumb {...thumb} />
+              </Switch.Root>
+            </label>
+            {meta.lineNumbers !== false && (
+              <label {...stylex.props(styles.row)}>
+                Start at
+                <input
+                  {...stylex.props(chrome.input, chrome.field, styles.startAt)}
+                  type="number"
+                  min={1}
+                  value={typeof meta.lineNumbers === "number" ? meta.lineNumbers : 1}
+                  onChange={(event) => {
+                    const n = Number(event.target.value);
+                    onChange({ ...meta, lineNumbers: n > 1 ? n : true });
+                  }}
+                />
+              </label>
+            )}
+            <label {...stylex.props(styles.row)}>
+              Copy button
+              <Switch.Root
+                {...denseSwitch}
+                checked={!meta.noCopy}
+                onCheckedChange={(on) => onChange({ ...meta, noCopy: !on })}
+              >
+                <Switch.Thumb {...thumb} />
+              </Switch.Root>
+            </label>
+            <label {...stylex.props(styles.metaField)}>
+              Meta
+              <input
+                {...stylex.props(chrome.input, chrome.field, styles.metaInput)}
+                value={raw ?? ""}
+                placeholder='title="…" lineNumbers'
+                spellCheck={false}
+                onChange={(event) => updateAttributes({ meta: event.target.value || null })}
+              />
+            </label>
+            <div {...stylex.props(styles.actions)}>
+              <button
+                type="button"
+                {...stylex.props(chrome.button, chrome.item, styles.actionItem)}
+                onClick={() => {
+                  const pos = getPos();
+                  if (pos != null) addCodeTab(editor, pos);
+                  setOpen(false);
+                }}
+              >
+                <Plus size={13} {...stylex.props(styles.actionIcon)} />
+                <span>Add tab</span>
+              </button>
+              <BlockActions
+                editor={editor}
+                range={() => {
+                  const pos = getPos();
+                  const block = pos == null ? undefined : editor.state.doc.nodeAt(pos);
+                  return block && pos != null ? { from: pos, to: pos + block.nodeSize } : undefined;
+                }}
+                onDone={() => setOpen(false)}
+                itemLook={styles.actionItem}
+              />
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+// the chrome sits out keystrokes in the code: only its attributes reach it
+const Header = memo(function Header({
+  editor,
+  getPos,
+  language,
+  raw,
+  meta,
+  updateAttributes,
+}: {
+  editor: Editor;
+  getPos: () => number | undefined;
+  language: string | null;
+  raw: string | null;
+  meta: CodeMeta;
+  updateAttributes: NodeViewProps["updateAttributes"];
+}) {
+  return (
+    <div
+      {...stylex.props(chrome.static, content.codeHeader)}
+      contentEditable={false}
+      data-fde-row=""
+    >
+      {meta.tab == null ? (
+        <SquareCode size={15} {...stylex.props(content.codeHeaderIcon)} />
+      ) : (
+        <input
+          {...stylex.props(chrome.input, content.codeTabLabel)}
+          data-code-tab-label=""
+          value={meta.tab}
+          placeholder="Tab…"
+          spellCheck={false}
+          tabIndex={-1}
+          onChange={(event) =>
+            updateAttributes({ meta: buildCodeMeta({ ...meta, tab: event.target.value }) })
+          }
+          // an unnamed tab renders a blank trigger: leaving it empty leaves the group
+          onBlur={() => {
+            if (meta.tab === "") updateAttributes({ meta: buildCodeMeta({ ...meta, tab: null }) });
+          }}
+        />
+      )}
+      <input
+        {...stylex.props(chrome.input, styles.titleInput)}
+        value={meta.title}
+        placeholder="Title…"
+        spellCheck={false}
+        tabIndex={-1}
+        onChange={(event) =>
+          updateAttributes({ meta: buildCodeMeta({ ...meta, title: event.target.value }) })
+        }
+      />
+      <MetaSettings
+        editor={editor}
+        getPos={getPos}
+        raw={raw}
+        meta={meta}
+        updateAttributes={updateAttributes}
+      />
+      <LanguageSelect
+        value={language ?? ""}
+        onChange={(value) => updateAttributes({ language: value })}
+      />
+      {!meta.noCopy && (
+        <CopyButton
+          getText={() => {
+            const pos = getPos();
+            return (pos != null && editor.state.doc.nodeAt(pos)?.textContent) || "";
+          }}
+        />
+      )}
+    </div>
+  );
+});
+
+function CodeBlockView(props: NodeViewProps) {
+  const { node, editor, getPos, updateAttributes } = props;
+  const language = (node.attrs.language as string | null) ?? null;
+  const raw = (node.attrs.meta as string | null) ?? null;
+  const meta = useMemo(() => parseCodeMeta(raw), [raw]);
+  useEffect(() => ensureGrammars(editor), [editor]);
+
+  const text = node.textContent;
+  let gutter: string | null = null;
+  if (meta.lineNumbers !== false) {
+    const start = typeof meta.lineNumbers === "number" ? meta.lineNumbers : 1;
+    let count = 1;
+    for (let i = text.indexOf("\n"); i !== -1; i = text.indexOf("\n", i + 1)) count++;
+    const rows: string[] = [];
+    for (let i = 0; i < count; i++) rows.push(String(start + i));
+    gutter = rows.join("\n");
+  }
+
+  return (
+    <NodeViewWrapper
+      as="figure"
+      dir="ltr"
+      data-selected={isRinged(props) || undefined}
+      {...stylex.props(content.codeBlock)}
+    >
+      <Header
+        editor={editor}
+        getPos={getPos}
+        language={language}
+        raw={raw}
+        meta={meta}
+        updateAttributes={updateAttributes}
+      />
+      <div {...stylex.props(styles.body)}>
+        {gutter != null && (
+          <pre
+            {...stylex.props(chrome.static, content.codeLines)}
+            contentEditable={false}
+            aria-hidden
+          >
+            {gutter}
+          </pre>
+        )}
+        <div {...stylex.props(content.codeScroll)}>
+          <pre {...stylex.props(content.codePre)}>
+            <NodeViewContent as={"code" as "div"} {...stylex.props(content.codeCode)} />
+          </pre>
+        </div>
+      </div>
+      {normalize(language) === "mermaid" && <MermaidDiagram code={text} />}
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * Insert the next tab after the code block at `pos`, naming this block's tab
+ * first when it has none, and select the new label. Consecutive `tab` fences
+ * are one group, so the new tab is numbered after the group.
+ */
+export function addCodeTab(editor: Editor, pos: number): boolean {
+  const { state } = editor;
+  const $pos = state.doc.resolve(pos);
+  const block = $pos.nodeAfter;
+  if (!block?.type.spec.code) return false;
+  const { parent } = $pos;
+  const index = $pos.index();
+  const tabbed = (i: number) => {
+    const node = parent.child(i);
+    return node.type === block.type && parseCodeMeta(node.attrs.meta).tab != null;
+  };
+  let count = 1;
+  for (let i = index - 1; i >= 0 && tabbed(i); i--) count++;
+  for (let i = index + 1; i < parent.childCount && tabbed(i); i++) count++;
+  const named = (meta: CodeMeta, n: number) => buildCodeMeta({ ...meta, tab: `Tab ${n}` });
+
+  const tr = state.tr;
+  const meta = parseCodeMeta(block.attrs.meta);
+  if (meta.tab == null)
+    tr.setNodeMarkup(pos, undefined, { ...block.attrs, meta: named(meta, count) });
+  const at = pos + block.nodeSize;
+  const next = block.type.create({
+    language: block.attrs.language,
+    meta: named(parseCodeMeta(null), count + 1),
+  });
+  tr.insert(at, next).setSelection(TextSelection.create(tr.doc, at + 1));
+  editor.view.dispatch(tr.scrollIntoView());
+  requestAnimationFrame(() => {
+    const dom = editor.isDestroyed ? null : editor.view.nodeDOM(at);
+    if (dom instanceof Element)
+      dom.querySelector<HTMLInputElement>("[data-code-tab-label]")?.select();
+  });
+  return true;
+}
+
+export function codeBlockExtension(): Extension {
+  return CodeBlockLowlight.extend({
+    // above the component keymap: in a tabbed block, Mod-Enter adds a code tab
+    // before it adds the surrounding Tab or Step
+    priority: 110,
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        meta: { default: null },
+      };
+    },
+    addKeyboardShortcuts() {
+      return {
+        ...this.parent?.(),
+        "Mod-Enter": () => {
+          const { $from } = this.editor.state.selection;
+          return (
+            $from.parent.type === this.type &&
+            parseCodeMeta($from.parent.attrs.meta).tab != null &&
+            addCodeTab(this.editor, $from.before())
+          );
+        },
+      };
+    },
+    addNodeView() {
+      return ReactNodeViewRenderer(CodeBlockView, {
+        ...nodeViewOptions,
+        className: contentClass.block,
+        // consecutive tabbed blocks join through a sibling rule in base.css
+        attrs: ({ node }) => ({
+          "data-code-tab": String(parseCodeMeta(node.attrs.meta).tab != null),
+        }),
+      });
+    },
+  }).configure({ lowlight }) as unknown as Extension;
+}

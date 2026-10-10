@@ -1,0 +1,43 @@
+import { MdxEditor, emptyComponent, fumadocsUiComponents } from "@fumadocs-editor/ui";
+import type { ComponentRenderProps, UiComponentSpec } from "@fumadocs-editor/ui";
+
+//#region renderer
+function Feature({ literals, children }: ComponentRenderProps) {
+  const soon = literals.soon === true;
+  return (
+    <div className="rounded-xl border border-fd-border bg-fd-card p-4">
+      {soon && (
+        <span
+          contentEditable={false}
+          className="float-right rounded-full bg-fd-primary/10 px-2 py-0.5 text-xs text-fd-primary"
+        >
+          Soon
+        </span>
+      )}
+      {children}
+    </div>
+  );
+}
+//#endregion
+
+//#region spec
+export const featureSpec: UiComponentSpec = {
+  name: "Feature",
+  label: "Feature",
+  attributeRegions: [{ attribute: "title", region: "title", placeholder: "Feature name…" }],
+  childrenRegion: { region: "body", placeholder: "Describe the feature…" },
+  props: [{ name: "soon", label: "Coming soon", type: "boolean", default: false }],
+  // regions render outside the renderer's tree; style them by name
+  regions: { title: "font-medium" },
+  insert: (specs) => emptyComponent(featureSpec, specs),
+  render: Feature,
+};
+//#endregion
+
+//#region usage
+const components = [...fumadocsUiComponents, featureSpec];
+
+export function Editor({ text }: { text: string }) {
+  return <MdxEditor defaultValue={text} components={components} />;
+}
+//#endregion

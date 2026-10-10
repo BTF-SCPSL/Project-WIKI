@@ -1,0 +1,294 @@
+"use client";
+import * as stylex from "@stylexjs/stylex";
+import { tokens } from "../styles/tokens.stylex";
+import { InputRule, textblockTypeInputRule, type Editor, type Extensions } from "@tiptap/core";
+import {
+  MATH_BLOCK_NODE,
+  MATH_INLINE_NODE,
+  MathBlock,
+  MathInline,
+} from "@fumadocs-editor/core/extensions";
+import {
+  NodeViewContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  type NodeViewProps,
+} from "@tiptap/react";
+import { useSyncExternalStore } from "react";
+import { content } from "../styles/content";
+import { nodeViewOptions } from "./node-view-options";
+import { chrome } from "../styles/shared";
+import { math } from "../styles/markers.stylex";
+
+type Katex = typeof import("katex").default;
+
+const styles = stylex.create({
+  /* Once a preview exists the source only shows while the caret is inside,
+   * so these re-declare the element's own display alongside the swap. */
+  srcInline: {
+    display: {
+      default: "inline-block",
+      [stylex.when.ancestor(":not([data-active])", math)]: "none",
+    },
+  },
+  srcBlock: {
+    display: { default: "block", [stylex.when.ancestor(":not([data-active])", math)]: "none" },
+  },
+  preview: {
+    cursor: "text",
+    display: { default: null, [stylex.when.ancestor("[data-active]", math)]: "none" },
+  },
+  previewBlock: { cursor: "text", display: "block", overflowX: "auto" },
+  blockActive: {
+    borderRadius: { default: null, [stylex.when.ancestor("[data-active]", math)]: 10 },
+    outline: {
+      default: null,
+      [stylex.when.ancestor("[data-active]", math)]:
+        `1px solid color-mix(in oklab, ${tokens.ring} 45%, ${tokens.border})`,
+    },
+    outlineOffset: { default: null, [stylex.when.ancestor("[data-active]", math)]: 2 },
+  },
+});
+
+const inlineClass = stylex.props(content.mathInline, math).className;
+const blockClass = stylex.props(content.block, math).className;
+
+// one lazy load shared by every math view; views subscribe until it lands
+let katexModule: Katex | null = null;
+const katexWaiters = new Set<() => void>();
+
+function subscribeKatex(onLoad: () => void): () => void {
+  if (!katexModule) {
+    if (katexWaiters.size === 0) {
+      void Promise.all([
+        import("katex"),
+        // @ts-expect-error -- style-only import, no module declaration
+        import("katex/dist/katex.min.css"),
+      ]).then(([m]) => {
+        katexModule = m.default;
+        for (const waiter of katexWaiters) waiter();
+      });
+    }
+    katexWaiters.add(onLoad);
+  }
+  return () => {
+    katexWaiters.delete(onLoad);
+  };
+}
+
+function getKatex() {
+  return katexModule;
+}
+
+function useKatex(): Katex | null {
+  return useSyncExternalStore(subscribeKatex, getKatex, () => null);
+}
+
+function Preview({
+  katex,
+  value,
+  display,
+  onClick,
+}: {
+  katex: Katex;
+  value: string;
+  display: boolean;
+  onClick: () => void;
+}) {
+  const html = katex.renderToString(value, {
+    displayMode: display,
+    throwOnError: false,
+  });
+  return (
+    <span
+      {...stylex.props(chrome.static, display ? styles.previewBlock : styles.preview)}
+      contentEditable={false}
+      onClick={onClick}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+function focusSource({ editor, getPos, node }: NodeViewProps) {
+  const pos = getPos();
+  if (typeof pos !== "number") return;
+  editor
+    .chain()
+    .focus()
+    .setTextSelection(pos + 1 + node.content.size)
+    .run();
+}
+
+function MathInlineView(props: NodeViewProps) {
+  const { node } = props;
+  const katex = useKatex();
+  const empty = node.content.size === 0;
+  const rendered = katex != null && !empty;
+  return (
+    <NodeViewWrapper as="span">
+      <span
+        {...stylex.props(content.mathInlineSrc, rendered && styles.srcInline)}
+        data-empty={empty || undefined}
+      >
+        <NodeViewContent as={"span" as "div"} />
+      </span>
+      {katex && !empty && (
+        <Preview
+          katex={katex}
+          value={node.textContent}
+          display={false}
+          onClick={() => focusSource(props)}
+        />
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+function MathBlockView(props: NodeViewProps) {
+  const { node } = props;
+  const katex = useKatex();
+  const empty = node.content.size === 0;
+  const rendered = katex != null && !empty;
+  return (
+    <NodeViewWrapper {...stylex.props(content.mathBlock, rendered && styles.blockActive)}>
+      <pre
+        {...stylex.props(content.mathBlockSrc, rendered && styles.srcBlock)}
+        data-empty={empty || undefined}
+      >
+        <NodeViewContent as={"code" as "div"} {...stylex.props(content.codeCode)} />
+      </pre>
+      {katex && !empty && (
+        <Preview
+          katex={katex}
+          value={node.textContent}
+          display
+          onClick={() => focusSource(props)}
+        />
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+/*
+ * Arrow entry into math. Inactive TeX is display:none (preview shows);
+ * Chromium and WebKit step into hidden text (activating the node), Firefox
+ * skips the whole node. Handle the crossing so every engine enters edit
+ * mode the same way.
+ */
+
+/*
+ * Entry caret goes to the END of the source, like click-to-edit
+ * (focusSource). A caret at source offset 0 is equivalent to the position
+ * before the node, so selectionToDOM leaves the DOM caret outside the
+ * (still hidden) source and typing lands beside the formula. End-of-source
+ * has text between it and either boundary, so placement sticks.
+ */
+
+function enterInline(editor: Editor, dir: 1 | -1): boolean {
+  const { $from, empty } = editor.state.selection;
+  if (!empty || !$from.parent.isTextblock) return false;
+  const adjacent = dir === 1 ? $from.nodeAfter : $from.nodeBefore;
+  if (adjacent?.type.name !== MATH_INLINE_NODE) return false;
+  const end = dir === 1 ? $from.pos + 1 + adjacent.content.size : $from.pos - 1;
+  return editor.commands.setTextSelection(end);
+}
+
+function enterBlock(editor: Editor, dir: 1 | -1, axis: "h" | "v"): boolean {
+  const { $from, empty } = editor.state.selection;
+  if (!empty || !$from.parent.isTextblock) return false;
+  const atEdge =
+    dir === 1 ? $from.parentOffset === $from.parent.content.size : $from.parentOffset === 0;
+  if (axis === "h") {
+    if (!atEdge) return false;
+  } else if (!atEdge && !editor.view.endOfTextblock(dir === 1 ? "down" : "up")) {
+    return false;
+  }
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const parent = $from.node(depth - 1);
+    const sibIndex = $from.index(depth - 1) + dir;
+    if (sibIndex < 0 || sibIndex >= parent.childCount) continue;
+    const sibling = parent.child(sibIndex);
+    if (sibling.type.name !== MATH_BLOCK_NODE) return false;
+    const boundary = dir === 1 ? $from.after(depth) : $from.before(depth);
+    const end = dir === 1 ? boundary + 1 + sibling.content.size : boundary - 1;
+    return editor.commands.setTextSelection(end);
+  }
+  return false;
+}
+
+/**
+ * The math node types wired to their KaTeX node views. Views register
+ * regardless of the dialect flag (a flag-off document never contains the
+ * nodes); only the creation paths (input rules) are gated, so math is
+ * unproducible while `SyntaxOptions.math` is off.
+ */
+export function mathExtensions(enabled: boolean): Extensions {
+  return [
+    MathInline.extend({
+      addNodeView: () =>
+        ReactNodeViewRenderer(MathInlineView, { ...nodeViewOptions, className: inlineClass }),
+      addInputRules() {
+        if (!enabled) return [];
+        return [
+          new InputRule({
+            find: /(?<!\$)\$([^$\s](?:[^$]*[^$\s])?)\$$/,
+            handler: ({ state, range, match }) => {
+              const node = this.type.create(null, state.schema.text(match[1]));
+              state.tr.replaceWith(range.from, range.to, node);
+            },
+          }),
+        ];
+      },
+      addKeyboardShortcuts() {
+        return {
+          ArrowRight: () => enterInline(this.editor, 1),
+          ArrowLeft: () => enterInline(this.editor, -1),
+          Enter: () => {
+            const { $from } = this.editor.state.selection;
+            if ($from.parent.type.name !== MATH_INLINE_NODE) return false;
+            return this.editor.commands.setTextSelection($from.after());
+          },
+          Backspace: () => {
+            const { $from, empty } = this.editor.state.selection;
+            if (
+              !empty ||
+              $from.parent.type.name !== MATH_INLINE_NODE ||
+              $from.parent.content.size > 0
+            ) {
+              return false;
+            }
+            const from = $from.before();
+            return this.editor.commands.deleteRange({ from, to: from + $from.parent.nodeSize });
+          },
+        };
+      },
+    }),
+    MathBlock.extend({
+      addNodeView: () =>
+        ReactNodeViewRenderer(MathBlockView, { ...nodeViewOptions, className: blockClass }),
+      addInputRules() {
+        if (!enabled) return [];
+        return [textblockTypeInputRule({ find: /^\$\$\s$/, type: this.type })];
+      },
+      addKeyboardShortcuts() {
+        return {
+          ArrowRight: () => enterBlock(this.editor, 1, "h"),
+          ArrowLeft: () => enterBlock(this.editor, -1, "h"),
+          ArrowDown: () => enterBlock(this.editor, 1, "v"),
+          ArrowUp: () => enterBlock(this.editor, -1, "v"),
+          Backspace: () => {
+            const { $from, empty } = this.editor.state.selection;
+            if (
+              !empty ||
+              $from.parent.type.name !== MATH_BLOCK_NODE ||
+              $from.parent.content.size > 0
+            ) {
+              return false;
+            }
+            return this.editor.commands.setNode("paragraph");
+          },
+        };
+      },
+    }),
+  ];
+}

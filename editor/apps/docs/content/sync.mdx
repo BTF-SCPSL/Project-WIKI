@@ -1,0 +1,118 @@
+---
+title: Sync
+icon: FolderSync
+description: Save to the file system with autosave and live merge
+---
+
+Sync connects the editor to a directory of `.md` and `.mdx` files:
+
+- edits autosave to disk
+- changes on disk (a `git pull`, a save from your IDE) merge into the open
+  document without moving your caret
+- a block changed on both sides becomes a conflict you resolve in one click
+
+## Setup
+
+<Steps>
+<Step>
+
+### Install
+
+```npm
+npm install @fumadocs-editor/core
+```
+
+</Step>
+<Step>
+
+### Add the Vite plugin
+
+It runs the sync server inside `vite dev`. `root` is the directory to edit.
+
+<include meta='title="vite.config.ts"'>../examples/sync-vite.ts</include>
+
+<Callout type="warn" title="Keep Vite away from the edited files">
+If `root` sits inside your Vite project, exclude it from the watcher, or every save reloads the page:
+
+```ts title="vite.config.ts"
+export default defineConfig({
+  server: { watch: { ignored: ["**/content/docs/**"] } },
+});
+```
+
+Never import those files as modules either (`?raw` included).
+
+</Callout>
+
+</Step>
+<Step>
+
+### Point the editor at a file
+
+<include meta='title="editor.tsx"'>../examples/sync-editor.tsx</include>
+
+The editor now loads the file, autosaves and shows a status dot in its
+header.
+
+</Step>
+</Steps>
+
+## Saving
+
+- Autosave runs 800 ms after you stop typing, and at most 5 s after the
+  first unsaved change. `⌘S` and closing the page save immediately.
+- A save never overwrites a file it has not seen. If the file changed on
+  disk in the meantime, that change is merged in first.
+- When the same block changed on both sides, your version is kept and saving
+  pauses until you pick **keep mine** or **take disk**.
+
+The status dot shows where the document stands. Mirror it elsewhere with
+`sync.onStatus`.
+
+| Status     | Meaning                                       |
+| ---------- | --------------------------------------------- |
+| `synced`   | disk matches what you see                     |
+| `dirty`    | edits waiting for autosave                    |
+| `saving`   | a save is in flight                           |
+| `conflict` | the same block changed locally and on disk    |
+| `offline`  | disconnected; edits are kept and saved later  |
+| `denied`   | the server rejected your [credentials](/auth) |
+
+## Sync client
+
+By default, every editor on the page shares one connection to the dev server.
+Create your own client to connect elsewhere, send [credentials](/auth) or
+turn on [collaboration](/collab), then pass it to every editor:
+
+<include meta='title="editor.tsx"'>../examples/sync-client.tsx</include>
+
+<auto-type-table path="../../../packages/core/src/sync/client.ts" name="SyncClientOptions" />
+
+## Standalone server
+
+Without Vite, `createSyncServer` gives you handlers for any Node HTTP server:
+
+<include meta='title="server.ts"'>../examples/sync-server.ts</include>
+
+The Vite plugin accepts the same options:
+
+<auto-type-table path="../../../packages/core/src/sync/node/server.ts" name="SyncServerOptions" />
+
+<Callout title="Other backends">
+  A database, a CMS or a worker can replace the Node server by speaking the [sync
+  protocol](/protocol).
+</Callout>
+
+## Without `MdxEditor`
+
+`sync` is built on `client.open`. Use it directly for a custom status UI or a
+non-React shell:
+
+<include meta='title="custom-document.tsx"'>../examples/sync-document.tsx</include>
+
+- `editor` is anything with `getMarkdown`, `applyExternalMarkdown`,
+  `setMarkdown` and `markSaved`. The editor ref qualifies.
+- Load `opened`'s `text` into the editor, call `changed()` on every edit.
+- A client holds one document per path.
+
+<auto-type-table path="../../../packages/core/src/sync/client.ts" name="SyncDocument" />
